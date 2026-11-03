@@ -1,0 +1,339 @@
+// 知衡 FinScope 数据模型
+// 设计原则：SQLite 单文件、零外部依赖；所有 JSON 字段以 TEXT 存储并由 Zod 在服务层校验。
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// 信息源：isSample=true 时读取随仓库分发的样例集（离线可用）；false 时真实抓取 RSS / Atom / JSON
+model Source {
+  id            String    @id @default(cuid())
+  name          String
+  kind          String // RSS | JSON | MANUAL
+  url           String?
+  isSample      Boolean   @default(false)
+  enabled       Boolean   @default(true)
+  credibility   Int       @default(3) // 1..5 人工标注档位
+  topicHint     String? // 默认主题 slug
+  lastFetchedAt DateTime?
+  lastStatus    String    @default("never") // never | ok | error
+  lastError     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  articles Article[]
+}
+
+model Article {
+  id             String    @id @default(cuid())
+  sourceId       String
+  source         Source    @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  title          String
+  summary        String
+  content        String?
+  url            String?
+  publishedAt    DateTime
+  fetchedAt      DateTime  @default(now())
+  region         String    @default("CN")
+  currency       String?
+  sentiment      String    @default("neutral") // neutral | positive | negative | mixed
+  impactDims     String    @default("[]") // JSON string[]
+  qualityScore   Int       @default(50)
+  qualityFlags   String    @default("[]") // JSON string[]
+  // 文章级结构化抽取（规则层先跑，LLM 模式可升级；全部为 JSON 字符串）
+  entities       String    @default("[]") // {name,type,role?}[]
+  eventType      String    @default("other") // macro_data | policy | company_event | market_move | industry_survey | rumor | other
+  keyNumbers     String    @default("[]") // {label,value,unit,period?,context?}[]
+  claims         String    @default("[]") // {text,kind,sourceName?}[]
+  extractionMode String    @default("rule") // rule | llm | fallback
+  extractedAt    DateTime?
+  contentHash    String    @unique
+  eventId        String?
+  event          Event?    @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  isDemo         Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+
+  topics ArticleTopic[]
+
+  @@index([publishedAt])
+  @@index([eventId])
+  @@index([sourceId])
+}
+
+model Topic {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  kind      String // industry | macro | fx | policy | company | commodity
+  keywords  String   @default("[]") // JSON string[]
+  followed  Boolean  @default(true)
+  color     String   @default("#2563eb")
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  articles ArticleTopic[]
+}
+
+model ArticleTopic {
+  articleId String
+  topicId   String
+  score     Float   @default(0)
+  hits      String  @default("[]")
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  topic     Topic   @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@id([articleId, topicId])
+  @@index([topicId])
+}
+
+/// 事件簇：同一事件的多个资讯聚合结果（规则层计算，可解释）
+model Event {
+  id           String    @id @default(cuid())
+  signature    String    @unique
+  title        String
+  summary      String
+  themes       String    @default("[]")
+  industries   String    @default("[]")
+  regions      String    @default("[]")
+  currencies   String    @default("[]")
+  sentiment    String    @default("neutral")
+  articleCount Int       @default(1)
+  sourceCount  Int       @default(1)
+  credibility  Int       @default(60)
+  completeness Int       @default(60)
+  eventType    String    @default("other")
+  entities     String    @default("[]") // {"name","type"}[]，来自成员文章抽取结果
+  // 事件级结构化分析（R2 写入；默认空对象表示尚未生成）
+  analysis     String    @default("{}") // EventAnalysis JSON
+  analysisMode String    @default("rule") // rule | llm | fallback
+  analysisAt   DateTime?
+  evidenceHash String? // 成员证据哈希，用于判断分析是否过期
+  firstSeenAt  DateTime
+  lastSeenAt   DateTime
+  createdAt    DateTime  @default(now())
+
+  articles Article[]
+
+  @@index([lastSeenAt])
+}
+
+model Asset {
+  id             String   @id @default(cuid())
+  name           String
+  category       String // CASH|DEPOSIT|MONEY_FUND|BOND|STOCK|FUND|REAL_ESTATE|INSURANCE|OTHER
+  currency       String   @default("CNY")
+  amount         Float // 市值（元），>0 且 <= 1e10
+  institution    String?
+  industry       String? // 供情报关联使用
+  liquidity      String? // HIGH | MEDIUM | LOW（空则按类别默认）
+  maturityMonths Int? // 剩余期限（月）
+  // 资产配置层新增字段（全部可空，兼容旧数据）
+  assetClass     String? // CASH|CN_BOND|CN_EQUITY|HK_EQUITY|US_EQUITY|GOLD|COMMODITY|SATELLITE|REAL_ESTATE|INSURANCE|OTHER
+  instrumentCode String? // ETF/基金代码，如 510300
+  quantity       Float? // 份额
+  costPrice      Float? // 成本价
+  note           String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([category])
+  @@index([instrumentCode])
+}
+
+model Liability {
+  id              String   @id @default(cuid())
+  name            String
+  category        String // MORTGAGE|CONSUMER_LOAN|CARD|CAR_LOAN|OTHER
+  currency        String   @default("CNY")
+  amount          Float
+  interestRate    Float? // 年化 %
+  monthlyPayment  Float?
+  remainingMonths Int?
+  note            String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model RiskProfile {
+  id        String   @id @default(cuid())
+  answers   String // JSON number[10]
+  score     Int // 0..100
+  band      String // CONSERVATIVE|STEADY|BALANCED|GROWTH|AGGRESSIVE
+  createdAt DateTime @default(now())
+}
+
+model Report {
+  id        String   @id @default(cuid())
+  type      String // BRIEF | CHECKUP | ALLOCATION | AGENT
+  title     String
+  markdown  String
+  html      String?
+  payload   String // JSON 结构化指标
+  mode      String   @default("mock")
+  citations String   @default("[]")
+  runId     String?
+  kind      String?
+  createdAt DateTime @default(now())
+
+  @@index([type, createdAt])
+  @@index([runId])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  role      String // user | assistant
+  content   String
+  citations String   @default("[]")
+  payload   String? // JSON：要点、建议追问、待办、图表提示等结构化回答
+  mode      String   @default("mock")
+  refused   Boolean  @default(false)
+  runId     String?
+  createdAt DateTime @default(now())
+}
+
+/// 单用户/家庭的资产配置档案。产品定位是本地个人工具，因此固定 id=default。
+model PortfolioProfile {
+  id                     String   @id @default("default")
+  baseCurrency           String   @default("CNY")
+  monthlyIncome          Float?
+  monthlyExpense         Float?
+  monthlyInvestable      Float?
+  currentAge             Int?
+  retirementAge          Int?
+  retirementAnnualSpend  Float?
+  retirementSavings      Float    @default(0)
+  retirementContribution Float    @default(0)
+  riskScore              Int      @default(50)
+  riskBand               String   @default("BALANCED")
+  horizonYears           Int      @default(10)
+  maxDrawdown            Float    @default(0.2)
+  emergencyMonths        Float    @default(6)
+  constraints            String   @default("{}") // JSON: max_single_etf / max_equity / ...
+  updatedAt              DateTime @updatedAt
+}
+
+/// 目标规划：应急金、教育金、养老、购房等。
+model Goal {
+  id                  String    @id @default(cuid())
+  name                String
+  type                String    @default("OTHER") // EMERGENCY|EDUCATION|RETIREMENT|HOUSE|OTHER
+  targetAmount        Float     @default(0)
+  currentAmount       Float     @default(0)
+  targetDate          DateTime?
+  years               Float?
+  monthlyContribution Float     @default(0)
+  priority            String    @default("medium")
+  inflation           Float     @default(0.025)
+  expectedReturn      Float     @default(0.05)
+  volatility          Float     @default(0.1)
+  note                String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+}
+
+/// 一次量化分析（可追溯输入与结果）。
+model AnalysisRun {
+  id        String   @id @default(cuid())
+  kind      String   @default("FULL")
+  status    String   @default("ok")
+  input     String
+  result    String?
+  summary   String   @default("")
+  mode      String   @default("real_data")
+  error     String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+/// 多智能体运行记录；步骤单独存储，前端可展示审计轨迹。
+model AgentRun {
+  id         String      @id @default(cuid())
+  task       String
+  status     String      @default("running")
+  mode       String      @default("deterministic")
+  model      String?
+  result     String?
+  error      String?
+  reportId   String?
+  createdAt  DateTime    @default(now())
+  finishedAt DateTime?
+  steps      AgentStep[]
+
+  @@index([createdAt])
+}
+
+model AgentStep {
+  id         String   @id @default(cuid())
+  runId      String
+  seq        Int
+  role       String
+  type       String
+  title      String
+  detail     String   @default("")
+  toolName   String?
+  toolInput  String?
+  toolOutput String?
+  status     String   @default("ok")
+  latencyMs  Int      @default(0)
+  createdAt  DateTime @default(now())
+  run        AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId, seq])
+}
+
+/// 图像输入（K 线截图、财报图片、持仓截图）。只存本地，不上传。
+model Upload {
+  id        String   @id @default(cuid())
+  filename  String
+  mime      String
+  size      Int
+  data      String // base64（本地演示规模）
+  analysis  String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+/// AI 调用审计：每次结构化任务一条，记录模式、耗时、缓存与降级原因
+model AiRun {
+  id          String   @id @default(cuid())
+  task        String
+  mode        String   @default("mock") // mock | llm | fallback
+  model       String?
+  status      String   @default("ok") // ok | cache | mock | fallback | error
+  latencyMs   Int      @default(0)
+  payloadHash String?
+  cacheHit    Boolean  @default(false)
+  error       String?
+  refType     String?
+  refId       String?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([task, createdAt])
+}
+
+/// AI 输出缓存：只缓存通过 schema 校验的成功结果，过期由读取时判断
+model AiCache {
+  key       String   @id
+  task      String
+  output    String
+  mode      String   @default("llm")
+  model     String?
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}

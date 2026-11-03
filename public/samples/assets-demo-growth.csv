@@ -1,0 +1,12 @@
+name,category,currency,amount,institution,industry,liquidity,maturityMonths,note
+工资卡活期,现金,CNY,18000,平安银行,,HIGH,,日常开支
+货币基金,货基,CNY,12000,余额宝,,HIGH,,灵活取用
+科技成长基金,基金,CNY,60000,广发基金,科技成长,MEDIUM,,主动管理型
+半导体主题基金,基金,CNY,35000,诺安基金,半导体,MEDIUM,,行业主题
+港股互联网ETF,基金,HKD,25000,示例券商,互联网,MEDIUM,,港股通
+纳斯达克100ETF,基金,USD,15000,示例券商,科技,MEDIUM,,海外权益
+债券基金,债基,CNY,20000,博时基金,固定收益,LOW,18,降低波动
+投资性房产,房产,CNY,900000,,房地产,LOW,240,按评估价估算
+储能主题基金,基金,CNY,18000,示例基金,新能源,MEDIUM,,主题基金
+储蓄型保险,保险,CNY,10000,友邦保险,保险,LOW,48,长期持有
+故意错误示例,股票,USDT,-500,,,HIGH,,这行用于演示导入校验

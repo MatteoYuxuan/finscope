@@ -1,0 +1,48 @@
+{
+  "name": "finscope",
+  "version": "2.0.0",
+  "private": true,
+  "description": "知衡 FinScope - 真实数据驱动的个人资产配置智能体：量化配置、风险分析、多智能体与可追溯研报",
+  "license": "MIT",
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "quant:dev": "python -m uvicorn app.main:app --app-dir services/quant --host 127.0.0.1 --port 8000 --reload",
+    "quant:start": "python -m uvicorn app.main:app --app-dir services/quant --host 127.0.0.1 --port 8000",
+    "quant:test": "python -m pytest services/quant/tests -q",
+    "start:easy": "node scripts/start.mjs",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "typecheck": "tsc --noEmit",
+    "db:push": "prisma db push",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:reset": "prisma db push --force-reset && tsx prisma/seed.ts",
+    "setup": "node scripts/setup.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "postinstall": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.3",
+    "clsx": "2.1.1",
+    "lucide-react": "1.66.0",
+    "next": "15.5.28",
+    "papaparse": "5.7.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "recharts": "3.10.1",
+    "tailwind-merge": "3.7.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "26.6.6",
+    "@types/papaparse": "5.5.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "prisma": "6.19.3",
+    "tailwindcss": "4.3.3",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vitest": "4.1.12"
+  }
+}

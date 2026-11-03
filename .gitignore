@@ -1,0 +1,38 @@
+node_modules/
+.next/
+out/
+dist/
+coverage/
+*.log
+npm-debug.log*
+
+# 本地数据库与卷
+prisma/dev.db
+prisma/dev.db-journal
+data/
+*.db
+*.db-journal
+
+# Python 量化服务缓存 / 报告 / 运行时 Key
+services/quant/data/*
+!services/quant/data/.gitkeep
+services/quant/.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# 环境变量（.env.example 需要提交，.env 不提交）
+.env
+.env.local
+.env.*.local
+
+# 工具缓存
+.npm-cache/
+.vitest/
+.DS_Store
+Thumbs.db
+*.tsbuildinfo
+next-env.d.ts
+
+# 本地覆盖的 compose（可能含真实 Key，禁止提交）
+docker-compose.override.yml

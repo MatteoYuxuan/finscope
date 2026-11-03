@@ -1,0 +1,26 @@
+services:
+  finscope:
+    build: .
+    image: finscope:latest
+    container_name: finscope
+    ports:
+      - "3000:3000"
+      - "8000:8000"
+    environment:
+      # LLM 可选：没有 Key 时自动走规则智能体
+      LLM_MODE: "llm"
+      # LLM_BASE_URL: "https://api.deepseek.com"
+      # LLM_API_KEY: "sk-请填写自己的Key"
+      # LLM_MODEL: "deepseek-chat"
+      LLM_TIMEOUT_MS: "90000"
+      QUANT_SERVICE_URL: "http://127.0.0.1:8000"
+      DATABASE_URL: "file:/app/data/finscope.db"
+      ALLOW_LIVE_DATA: "true"
+    volumes:
+      - finscope-data:/app/data
+      - quant-data:/app/services/quant/data
+    restart: unless-stopped
+
+volumes:
+  finscope-data:
+  quant-data:
