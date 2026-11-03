@@ -7,6 +7,9 @@
 
 面向 **2026 软工实践周 · 高级组 · 金融经贸** 主题（个人理财与资产梳理智能体）。
 
+> 提交系统简介 / GitHub About / 长版介绍：[docs/PROJECT_INTRO.md](docs/PROJECT_INTRO.md)
+> 海报、PPT 封面、视频封面的文案与即梦提示词：[docs/POSTER_KIT.md](docs/POSTER_KIT.md)
+
 ---
 
 ## 一、它解决什么问题
